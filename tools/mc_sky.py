@@ -543,6 +543,10 @@ def _lamp(st, sun_strength=3.0, overcast_key=0.35):
     ob.data.color = col
     ob.data.energy = sun_strength * st['light_factor'] * (st['rain_bright'] * k + r * overcast_key)
     ob.data.angle = math.radians(lerp(r, 1.5, 90.0))
+    # 1 cm shadow texels (a character pixel is 6 cm): at the default 1 mm the sun / moon / star
+    # quads a kilometre away request shadow pages and overflow EEVEE's buffer
+    # ("Shadow buffer full" at night, 2026-11-16)
+    ob.data.shadow_maximum_resolution = 0.01
     return ob
 
 

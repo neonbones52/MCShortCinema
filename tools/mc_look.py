@@ -44,7 +44,7 @@ LOOKS = {
                    vignette=0.38, grain=0.09, knee=0.7,
                    haze=dict(start=6, end=80, amount=0.45, color=(0.95, 0.85, 0.62))),
     # finale: night look, darker; the fireworks carry the colour
-    'finale': dict(exposure=0.0, temp=(6500, 7400), tint=(10, 9), lift=(0.998, 0.999, 1.005, 0.002),
+    'finale': dict(exposure=0.35, temp=(6500, 7400), tint=(10, 9), lift=(0.998, 0.999, 1.005, 0.002),
                    gamma=(0.99, 1.0, 1.015, 1.0), gain=(1.0, 1.0, 1.0, 1.0), contrast=1.08,
                    saturation=0.95, bloom=dict(threshold=0.7, strength=0.30, size=0.6),
                    vignette=0.30, grain=0.0, knee=0.75,

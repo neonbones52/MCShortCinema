@@ -410,6 +410,55 @@ def particle_material(strength=12.0):
     return m
 
 
+def set_flash_gain(gain=1.0):
+    """Scale the explosion flash (OverlayParticle) opacity; sparks are untouched. The game's
+    flash is 0.6 alpha; the finale keeps it lower so no flash swamps the frame (photosensitivity)."""
+    m = particle_material()
+    nt = m.node_tree
+    g = nt.nodes.get("FlashGain")
+    if g is None:
+        ms = next(n for n in nt.nodes if n.type == 'MIX_SHADER')
+        alpha = ms.inputs[0].links[0].from_node
+        kind = next(n for n in nt.nodes if n.type == 'ATTRIBUTE' and n.attribute_name == "p_kind")
+        g = nt.nodes.new('ShaderNodeMapRange')            # kind 0 -> 1, kind 1 -> gain
+        g.name = g.label = "FlashGain"
+        nt.links.new(kind.outputs['Fac'], g.inputs['Value'])
+        g.inputs['To Min'].default_value = 1.0
+        mul = nt.nodes.new('ShaderNodeMath')
+        mul.operation = 'MULTIPLY'
+        nt.links.new(alpha.outputs[0], mul.inputs[0])
+        nt.links.new(g.outputs['Result'], mul.inputs[1])
+        nt.links.new(mul.outputs[0], ms.inputs[0])
+    g.inputs['To Max'].default_value = gain
+    return m
+
+
+def glow_light(name, pos, frame, col, peak=15000.0, attack=4, hold=2, decay=36, collection=None):
+    """Explosion light without a hard on/off: rises over `attack` frames, holds, then fades out
+    (smoothstep keys). No shadows. For the finale, where light must flow, not strobe."""
+    ld = bpy.data.lights.new(name, 'POINT')
+    ld.color = tuple(srgb_to_linear(c) for c in rgb(col))
+    ld.shadow_soft_size = 2.0
+    ld.use_shadow = False
+    ob = bpy.data.objects.new(name, ld)
+    (collection or bpy.context.scene.collection).objects.link(ob)
+    ob.location = pos
+    keys = [(frame - attack, 0.0), (frame, peak), (frame + hold, peak), (frame + hold + decay, 0.0)]
+    for f, e in keys:
+        ld.energy = e
+        ld.keyframe_insert("energy", frame=f)
+    ad = ob.data.animation_data
+    if ad and ad.action:
+        for layer in ad.action.layers:
+            for strip in layer.strips:
+                for cb in strip.channelbags:
+                    for fc in cb.fcurves:
+                        for k in fc.keyframe_points:
+                            k.interpolation = 'BEZIER'
+                            k.handle_left_type = k.handle_right_type = 'AUTO_CLAMPED'
+    return ob
+
+
 # ------------------------------------------------------------------ helpers for a shot
 def rocket_object(name, track, collection=None):
     """The flying rocket item as a camera-facing sprite, keyed per tick."""

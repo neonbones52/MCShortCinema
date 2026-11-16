@@ -105,15 +105,24 @@ def fire(cloud, rig, head_x, frame, rng, colors, fades=(), flight=3, multishot=T
     """Shoot 1 or 3 firework rockets; returns a list of (track, burst_frame, burst_pos)."""
     base = look_dir(rig, head_x)
     origin = rig.matrix_world.translation + Vector((0, 0, 1.5))       # eye height - 0.1, villager
+    return shoot(cloud, origin, base, frame, rng, colors, fades, flight, multishot, explode, light,
+                 light_shadow, collection, rig.name[:-4])
+
+
+def shoot(cloud, origin, base, frame, rng, colors, fades=(), flight=3, multishot=True, explode=True,
+          light=True, light_shadow=False, collection=None, name="shot", light_fn=None):
+    """The crossbow shot itself from any point and aim (no rig needed): multishot fan, game
+    inaccuracy, straight flight at 1.6 b/tick, explosion at the end of the lifetime.
+    light_fn(name, pos, frame, col) replaces the default burst light (e.g. FW.glow_light)."""
     offsets = (0.0, -10.0, 10.0) if multishot else (0.0,)
     up = Vector((0, 0, 1))
     shots = []
     for k, yaw in enumerate(offsets):
-        d = (Matrix.Rotation(math.radians(yaw), 3, up) @ base).normalized()
+        d = (Matrix.Rotation(math.radians(yaw), 3, up) @ Vector(base)).normalized()
         d = Vector((d.x + rng.gauss(0, 1) * 0.0172275, d.y + rng.gauss(0, 1) * 0.0172275,
                     d.z + rng.gauss(0, 1) * 0.0172275)).normalized() * POWER
         life = 10 * (1 + flight) + rng.randrange(6) + rng.randrange(7)
-        pos = origin.copy()
+        pos = Vector(origin).copy()
         track = [(frame, pos.copy())]
         for t in range(1, life + 1):
             pos += d
@@ -121,16 +130,20 @@ def fire(cloud, rig, head_x, frame, rng, colors, fades=(), flight=3, multishot=T
             track.append((f, pos.copy()))
             cloud.spark(pos.copy(), (rng.gauss(0, 1) * 0.05, -rng.gauss(0, 1) * 0.05, -d.z * 0.5), f, FW.WHITE)
         bf, bp = track[-1]
-        FW.rocket_object(f"{rig.name[:-4]}.shot.{int(frame)}.{k}", track, collection)
+        FW.rocket_object(f"{name}.shot.{int(frame)}.{k}", track, collection)
+        col = None
         if explode:
             col = rng.choice(colors)
             cloud.large_ball(bp, bf, colors=(col,), fades=fades, trail=rng.random() < 0.3,
                              twinkle=rng.random() < 0.4)
             if light:
-                lo = FW.burst_light(f"{rig.name[:-4]}.burst.{int(frame)}.{k}", bp, [bf], col, energy=40000,
-                                    collection=collection)
-                lo.data.use_shadow = light_shadow
-        shots.append((track, bf, bp))
+                if light_fn:
+                    light_fn(f"{name}.burst.{int(frame)}.{k}", bp, bf, col)
+                else:
+                    lo = FW.burst_light(f"{name}.burst.{int(frame)}.{k}", bp, [bf], col, energy=40000,
+                                        collection=collection)
+                    lo.data.use_shadow = light_shadow
+        shots.append((track, bf, bp, col))
     return shots
 
 
