@@ -554,7 +554,7 @@ def terrain_fog_range(render_distance=12):
 # ------------------------------------------------------------------ all together
 def apply(tick=6000, rain=0.0, render_distance=12, day=0, ground_mc_y=64.0, cloud_center=None,
           cloud_radius=600.0, cloud_end=2048.0, sky_scale=10.0, sun_strength=3.0, ambient=0.35,
-          overcast_fill=0.05, overcast_key=0.35, frame_start=None, exact_colors=True):
+          overcast_fill=0.05, overcast_key=0.35, frame_start=None, exact_colors=True, haze=None):
     """Build / update the sky for the scene camera. sky_scale: sun, moon and stars are placed at
     100 * sky_scale blocks (the game's 100, scaled so the scene never pokes through them)."""
     sc = bpy.context.scene
@@ -609,16 +609,18 @@ def apply(tick=6000, rain=0.0, render_distance=12, day=0, ground_mc_y=64.0, clou
     if exact_colors:
         sc.view_settings.view_transform = 'Standard'
         sc.view_settings.look = 'None'
-    terrain_fog(st)
+    terrain_fog(st, haze=haze)
     sc["mc_sky"] = dict(tick=tick, rain=rain, render_distance=render_distance, day=day,
                         moon_phase=st['moon_phase'])
     return st
 
 
 # ------------------------------------------------------------------ terrain fog (FogRenderer)
-def _fog_group(st):
+def _fog_group(st, haze=None):
     """Node group 'MC.TerrainFog': Shader in -> fogged Shader out. Cylindrical distance
-    max(|xy|, |z|) to the camera, linear between the render-distance fog start and end."""
+    max(|xy|, |z|) to the camera, linear between the render-distance fog start and end.
+    haze (not in the game; look-dev): dict(start, end, amount, color=None) - an extra
+    distance haze (spherical distance, smoothstep), colour = the fog colour unless given (sRGB)."""
     start, end = terrain_fog_range(st['render_distance'])
     g = bpy.data.node_groups.get("MC.TerrainFog")
     if g is None:
@@ -655,19 +657,35 @@ def _fog_group(st):
     mr.inputs['From Min'].default_value = start
     mr.inputs['From Max'].default_value = end
     g.links.new(cyl.outputs[0], mr.inputs['Value'])
+    src = gi.outputs[0]
+    if haze and haze.get('amount', 0) > 0:
+        hr = nt.new('ShaderNodeMapRange')
+        hr.clamp = True
+        hr.interpolation_type = 'SMOOTHSTEP'
+        hr.inputs['From Min'].default_value = haze['start']
+        hr.inputs['From Max'].default_value = haze['end']
+        hr.inputs['To Max'].default_value = haze['amount']
+        g.links.new(camd.outputs['View Distance'], hr.inputs['Value'])
+        hem = nt.new('ShaderNodeEmission')
+        hem.inputs['Color'].default_value = (*lin(haze.get('color') or st['fog']), 1)
+        hmix = nt.new('ShaderNodeMixShader')
+        g.links.new(hr.outputs['Result'], hmix.inputs[0])
+        g.links.new(src, hmix.inputs[1])
+        g.links.new(hem.outputs[0], hmix.inputs[2])
+        src = hmix.outputs[0]
     em = nt.new('ShaderNodeEmission')
     em.inputs['Color'].default_value = (*lin(st['fog']), 1)
     mix = nt.new('ShaderNodeMixShader')
     g.links.new(mr.outputs['Result'], mix.inputs[0])
-    g.links.new(gi.outputs[0], mix.inputs[1])
+    g.links.new(src, mix.inputs[1])
     g.links.new(em.outputs[0], mix.inputs[2])
     g.links.new(mix.outputs[0], go.inputs[0])
     return g
 
 
-def terrain_fog(st, materials=None):
+def terrain_fog(st, materials=None, haze=None):
     """Insert MC.TerrainFog before the output of every scene material (sky ones excluded)."""
-    g = _fog_group(st)
+    g = _fog_group(st, haze)
     if materials is None:
         materials = {s.material for o in bpy.context.scene.objects if o.type == 'MESH'
                      for s in o.material_slots if s.material}
