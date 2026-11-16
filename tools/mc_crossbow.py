@@ -110,10 +110,13 @@ def fire(cloud, rig, head_x, frame, rng, colors, fades=(), flight=3, multishot=T
 
 
 def shoot(cloud, origin, base, frame, rng, colors, fades=(), flight=3, multishot=True, explode=True,
-          light=True, light_shadow=False, collection=None, name="shot", light_fn=None):
+          light=True, light_shadow=False, collection=None, name="shot", light_fn=None, life=None):
     """The crossbow shot itself from any point and aim (no rig needed): multishot fan, game
     inaccuracy, straight flight at 1.6 b/tick, explosion at the end of the lifetime.
-    light_fn(name, pos, frame, col) replaces the default burst light (e.g. FW.glow_light)."""
+    light_fn(name, pos, frame, col) replaces the default burst light (e.g. FW.glow_light).
+    life: ticks until the explosion, one per rocket of the fan (None = the game's random
+    lifetime); a rocket that hits a flyer explodes on contact, so give the centre rocket the
+    ticks to the target."""
     offsets = (0.0, -10.0, 10.0) if multishot else (0.0,)
     up = Vector((0, 0, 1))
     shots = []
@@ -121,10 +124,12 @@ def shoot(cloud, origin, base, frame, rng, colors, fades=(), flight=3, multishot
         d = (Matrix.Rotation(math.radians(yaw), 3, up) @ Vector(base)).normalized()
         d = Vector((d.x + rng.gauss(0, 1) * 0.0172275, d.y + rng.gauss(0, 1) * 0.0172275,
                     d.z + rng.gauss(0, 1) * 0.0172275)).normalized() * POWER
-        life = 10 * (1 + flight) + rng.randrange(6) + rng.randrange(7)
+        ticks = 10 * (1 + flight) + rng.randrange(6) + rng.randrange(7)
+        if life is not None and life[k] is not None:
+            ticks = int(life[k])
         pos = Vector(origin).copy()
         track = [(frame, pos.copy())]
-        for t in range(1, life + 1):
+        for t in range(1, ticks + 1):
             pos += d
             f = frame + t * fps() / TPS
             track.append((f, pos.copy()))

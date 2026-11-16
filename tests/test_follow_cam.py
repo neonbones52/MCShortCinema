@@ -21,7 +21,6 @@ import os
 import random
 import sys
 
-import bmesh
 import bpy
 from mathutils import Vector
 
@@ -33,14 +32,13 @@ import mc_firework as FW
 import mc_flight as F
 import mc_look as L
 import mc_sky as SKY
+import mc_stage as ST
 importlib.reload(CAM)
 
 ROOT = r"C:\Dev\Projects\CinemaShort"
-RP = os.path.join(ROOT, r"assets\mc_rp\assets\minecraft\textures\block")
 OUT = os.path.join(ROOT, "renders", "tests", "follow_cam")
 FRAMES = (1, 192)                 # 8 s
 TICKS = 160
-GRASS = "#91bd59"                 # plains grass tint
 LOOK = "cold"                     # the training ground: overcast, drained
 START = (0.0, 0.0, 0.0)
 
@@ -76,65 +74,13 @@ def pilot(t):
     return c
 
 
-def tinted(name, png, tint):
-    mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
-    nt = mat.node_tree
-    bsdf = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
-    tex = nt.nodes.new('ShaderNodeTexImage')
-    tex.image = C.image(png)
-    tex.interpolation = 'Closest'
-    mix = nt.nodes.new('ShaderNodeMix')
-    mix.data_type = 'RGBA'
-    mix.blend_type = 'MULTIPLY'
-    mix.inputs['Factor'].default_value = 1.0
-    nt.links.new(tex.outputs['Color'], mix.inputs['A'])
-    a, r, g, b = SKY.parse_color(tint)
-    mix.inputs['B'].default_value = (*SKY.lin((r, g, b)), 1)
-    nt.links.new(mix.outputs['Result'], bsdf.inputs['Base Color'])
-    bsdf.inputs['Roughness'].default_value = 0.9
-    return mat
-
-
-def boxes(name, mat, items):
-    """One mesh of axis-aligned boxes [(lo, hi), ...], UVs = world coordinates (1 block = 1 tile)."""
-    sc = bpy.context.scene
-    bm = bmesh.new()
-    uvl = bm.loops.layers.uv.new("UVMap")
-    for lo, hi in items:
-        lo, hi = Vector(lo), Vector(hi)
-        ret = bmesh.ops.create_cube(bm, size=1.0)
-        for v in ret['verts']:
-            v.co = Vector(lo[i] + (v.co[i] + 0.5) * (hi[i] - lo[i]) for i in range(3))
-    bm.normal_update()
-    for f in bm.faces:
-        ax = max(range(3), key=lambda i: abs(f.normal[i]))
-        u_ax, v_ax = ((0, 1) if ax == 2 else ((1, 2) if ax == 0 else (0, 2)))
-        for loop in f.loops:
-            loop[uvl].uv = (loop.vert.co[u_ax], loop.vert.co[v_ax])
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    me.materials.append(mat)
-    ob = bpy.data.objects.new(name, me)
-    sc.collection.objects.link(ob)
-    return ob
-
-
-def block_mat(tex):
-    mat = C.material("block." + tex, os.path.join(RP, tex + ".png"), rough=0.9, spec=0.15)
-    next(n for n in mat.node_tree.nodes if n.type == 'TEX_IMAGE').extension = 'REPEAT'
-    return mat
-
-
 def training_ground():
     """Things to fly past: without them a camera that keeps pace shows no speed at all."""
     rng = random.Random(12)
-    boxes("Set.Grass", tinted("block.grass_tinted", os.path.join(RP, "grass_block_top.png"), GRASS),
-          [((-400, -400, -1), (800, 400, 0))])
+    ST.boxes("Set.Grass", ST.grass(), [((-400, -400, -1), (800, 400, 0))])
     # a dirt track under the flight path and a line of posts along it, one every 12 blocks
-    boxes("Set.Track", block_mat("coarse_dirt"), [((-30, 5, 0), (520, 8, 0.02))])
-    boxes("Set.Posts", block_mat("oak_log"), [((x, 10, 0), (x + 1, 11, 4)) for x in range(-24, 520, 12)])
+    ST.boxes("Set.Track", ST.block_mat("coarse_dirt"), [((-30, 5, 0), (520, 8, 0.02))])
+    ST.boxes("Set.Posts", ST.block_mat("oak_log"), [((x, 10, 0), (x + 1, 11, 4)) for x in range(-24, 520, 12)])
     hay, stone = [], []
     for _ in range(170):
         x, y = rng.uniform(-30, 520), rng.uniform(-70, 70)
@@ -143,8 +89,8 @@ def training_ground():
         x, y = math.floor(x), math.floor(y)
         w, d, h = rng.choice(((1, 1, 1), (2, 1, 1), (2, 2, 1), (2, 2, 2), (3, 2, 2)))
         (hay if rng.random() < 0.7 else stone).append(((x, y, 0), (x + w, y + d, h)))
-    boxes("Set.Hay", block_mat("hay_block_side"), hay)
-    boxes("Set.Stone", block_mat("cobblestone"), stone)
+    ST.boxes("Set.Hay", ST.block_mat("hay_block_side"), hay)
+    ST.boxes("Set.Stone", ST.block_mat("cobblestone"), stone)
 
 
 def use_camera(name):
