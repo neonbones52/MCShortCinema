@@ -17,6 +17,7 @@ sys.path.insert(0, r"C:\Dev\Projects\CinemaShort\tests")
 import mc_look as L
 import mc_sky as SKY
 
+VERSION = 2
 LOOK_OUT = r"C:\Dev\Projects\CinemaShort\renders\tests\look"
 os.makedirs(LOOK_OUT, exist_ok=True)
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ["village"]
@@ -58,6 +59,6 @@ elif mode == "raw":
     L.apply("none", view_transform="Standard")
 else:
     L.apply("none", view_transform="AgX")
-sc.render.filepath = os.path.join(LOOK_OUT, f"{look}_{mode}_v1.png")
+sc.render.filepath = os.path.join(LOOK_OUT, f"{look}_{mode}_v{VERSION}.png")
 bpy.ops.render.render(write_still=True)
 print("WROTE", sc.render.filepath)

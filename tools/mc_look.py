@@ -22,32 +22,32 @@ LOOKS = {
     'village': dict(exposure=0.0, temp=(6500, 5900), tint=(10, 11), lift=(1.0, 1.0, 0.996, 0.0),
                     gamma=(1.0, 1.0, 0.985, 1.0), gain=(1.03, 1.01, 0.97, 1.0), contrast=1.04,
                     saturation=1.07, bloom=dict(threshold=1.0, strength=0.12, size=0.6),
-                    vignette=0.18, grain=0.012, knee=0.8,
+                    vignette=0.18, grain=0.0, knee=0.8,
                     haze=dict(start=40, end=260, amount=0.30)),
     # after the summons: cold grey-blue, drained, flat, heavier air
     'cold': dict(exposure=-0.1, temp=(6500, 7800), tint=(10, 7), lift=(0.997, 0.999, 1.006, 0.006),
                  gamma=(0.99, 1.0, 1.015, 1.0), gain=(0.97, 0.99, 1.02, 1.0), contrast=0.93,
                  saturation=0.55, bloom=dict(threshold=1.2, strength=0.06, size=0.5),
-                 vignette=0.22, grain=0.018, knee=0.8,
+                 vignette=0.22, grain=0.0, knee=0.8,
                  haze=dict(start=20, end=170, amount=0.55)),
     # night flight / ambush: blue shadows that do not crush, fireworks bloom, colours kept
     'night': dict(exposure=0.2, temp=(6500, 7600), tint=(10, 9), lift=(0.997, 0.999, 1.008, 0.003),
                   gamma=(0.985, 1.0, 1.02, 1.0), gain=(1.0, 1.0, 1.0, 1.0), contrast=1.04,
                   saturation=0.9, bloom=dict(threshold=0.7, strength=0.35, size=0.6),
-                  vignette=0.28, grain=0.022, knee=0.75,
+                  vignette=0.28, grain=0.0, knee=0.75,
                   haze=dict(start=30, end=200, amount=0.35)),
     # memories (shot 22): overexposed, warm beige-yellow, glowing, lifted shadows, low contrast,
     # haze, vignette, grain
     'memory': dict(exposure=0.7, temp=(6500, 4400), tint=(10, 16), lift=(1.0, 0.996, 0.984, 0.030),
                    gamma=(1.05, 1.02, 0.95, 1.0), gain=(1.03, 0.99, 0.86, 1.0), contrast=0.80,
                    saturation=0.9, bloom=dict(threshold=0.35, strength=0.85, size=0.9),
-                   vignette=0.38, grain=0.040, knee=0.7,
+                   vignette=0.38, grain=0.09, knee=0.7,
                    haze=dict(start=6, end=80, amount=0.45, color=(0.95, 0.85, 0.62))),
     # finale: night look, darker; the fireworks carry the colour
     'finale': dict(exposure=0.0, temp=(6500, 7400), tint=(10, 9), lift=(0.998, 0.999, 1.005, 0.002),
                    gamma=(0.99, 1.0, 1.015, 1.0), gain=(1.0, 1.0, 1.0, 1.0), contrast=1.08,
                    saturation=0.95, bloom=dict(threshold=0.7, strength=0.30, size=0.6),
-                   vignette=0.30, grain=0.022, knee=0.75,
+                   vignette=0.30, grain=0.0, knee=0.75,
                    haze=dict(start=30, end=200, amount=0.25)),
 }
 
@@ -194,7 +194,9 @@ def build(name):
         nt.links.new(mr.outputs['Result'], mul.inputs['B'])
         src = mul.outputs['Result']
 
-    # grain: per-frame white noise, added around zero, slightly weaker in the deep shadows
+    # grain (memories only, per the approved look): per-frame white noise applied as a
+    # multiplicative +-grain in linear light, so it reads evenly from shadows to highlights
+    # like film grain instead of speckling the darks (an additive noise did that, 2026-11-16)
     if P.get('grain', 0) > 0:
         ic2 = nt.nodes.new('CompositorNodeImageCoordinates')
         nt.links.new(src, ic2.inputs[0])
@@ -203,18 +205,14 @@ def build(name):
         wn.noise_dimensions = '4D'
         nt.links.new(ic2.outputs['Pixel'], wn.inputs['Vector'])
         nt.links.new(st.outputs['Frame'], wn.inputs['W'])
-        centred = _math(nt, 'MULTIPLY', _math(nt, 'SUBTRACT', wn.outputs['Value'], 0.5), P['grain'] * 2.0)
-        add = nt.nodes.new('ShaderNodeMix')
-        add.data_type = 'RGBA'
-        add.blend_type = 'ADD'
-        add.inputs['Factor'].default_value = 1.0
-        nt.links.new(src, add.inputs['A'])
-        comb = nt.nodes.new('CompositorNodeCombineColor')
-        for i in range(3):
-            nt.links.new(centred, comb.inputs[i])
-        comb.inputs[3].default_value = 1.0
-        nt.links.new(comb.outputs[0], add.inputs['B'])
-        src = add.outputs['Result']
+        factor = _math(nt, 'ADD', _math(nt, 'MULTIPLY', _math(nt, 'SUBTRACT', wn.outputs['Value'], 0.5), P['grain'] * 2.0), 1.0)
+        mul = nt.nodes.new('ShaderNodeMix')
+        mul.data_type = 'RGBA'
+        mul.blend_type = 'MULTIPLY'
+        mul.inputs['Factor'].default_value = 1.0
+        nt.links.new(src, mul.inputs['A'])
+        nt.links.new(factor, mul.inputs['B'])
+        src = mul.outputs['Result']
 
     nt.links.new(src, out.inputs[0])
     return nt
