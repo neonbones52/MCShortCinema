@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "blender": {
+      "command": "C:\\Dev\\Projects\\CinemaShort\\.venv-blender-mcp\\Scripts\\blender-mcp.exe",
+      "args": []
+    }
+  }
+}

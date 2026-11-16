@@ -1,0 +1,15 @@
+# Mojang / Minecraft assets and anything derived from them: never publish
+assets/
+# music (copyrighted)
+*.mp3
+*.wav
+# heavy binaries: scenes and renders live outside git
+*.blend
+*.blend1
+blender/
+renders/
+# local environment
+.venv-blender-mcp/
+__pycache__/
+*.pyc
+.claude/
