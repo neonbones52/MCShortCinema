@@ -41,6 +41,20 @@ DYE = {"white": 0xF9FFFE, "orange": 0xF9801D, "magenta": 0xC74EBD, "light_blue":
        "light_gray": 0x9D9D97, "cyan": 0x169C9C, "purple": 0x8932B8, "blue": 0x3C44AA,
        "brown": 0x835432, "green": 0x5E7C16, "red": 0xB02E26, "black": 0x1D1D21}
 
+# the empires' banners, as the user gave them (2026-11-21), verbatim /give commands
+EMPIRES = {
+    "steve": '/give @s minecraft:red_banner[minecraft:banner_patterns=[{color: "yellow", pattern: "flower"},'
+             '{color: "red", pattern: "triangle_top"},{color: "red", pattern: "piglin"}]]',
+    "alex": '/give @s minecraft:blue_banner[minecraft:banner_patterns=[{color: "yellow", pattern: "border"},'
+            '{color: "yellow", pattern: "circle"},{color: "yellow", pattern: "guster"},'
+            '{color: "yellow", pattern: "triangles_top"}]]',
+}
+
+
+def empire(who, name=None, standing=True, collection=None):
+    """The banner of an empire ("steve" / "alex")."""
+    return from_give(EMPIRES[who], name or "Banner." + who.capitalize(), standing, collection)
+
 
 def parse_give(cmd):
     """'/give @s minecraft:red_banner[minecraft:banner_patterns=[{color: "yellow", pattern:

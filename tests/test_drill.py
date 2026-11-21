@@ -18,11 +18,13 @@ import bpy
 
 sys.path.insert(0, r"C:\Dev\Projects\CinemaShort\tools")
 import importlib
+import mc_banner as BN
 import mc_character as C
 import mc_look as L
 import mc_set as SET
 import mc_sky as SKY
 importlib.reload(SET)
+importlib.reload(BN)
 
 ROOT = r"C:\Dev\Projects\CinemaShort"
 OUT = os.path.join(ROOT, "renders", "tests", "drill")
@@ -37,7 +39,7 @@ SKINS = ("plains_farmer", "plains_plain", "plains_armorer", "plains_weaponsmith"
 # name: (position, target, lens) in set coordinates (X east, Y up, Z south)
 CAMS = {
     "Cam.Wide": ((150, Above(24), 178), (82, LV + 2, 116), 24),                        # the whole ground
-    "Cam.Line": ((56, Above(1.7), LINE[0][2] - 5), (70, LV + 2.4, LINE[0][2] + 0.5), 35),   # shots 09-10
+    "Cam.Line": ((55, Above(2.0), LINE[0][2] - 8), (71, LV + 3.0, LINE[0][2] + 5), 28),     # shots 09-10
     "Cam.Fort": ((72, Above(1.7), LINE[0][2] + 6), (70, LV + 5, M["gate_south"][2]), 24),   # behind the line
     "Cam.Range": ((128, Above(5), 160), (126, LV + 2, M["range_centre_z"]), 24),       # shot 11: haystacks
     "Cam.Flight": ((140, Above(12), 140), (260, Above(10), M["range_centre_z"]), 35),  # shot 12 height
@@ -60,6 +62,28 @@ def recruits():
         rig.rotation_euler = (0, 0, math.pi)
 
 
+def banners(frame_end=250):
+    """Steve's banner (user, 2026-11-21: "wherever, as long as it reads in the shots"), placed
+    as the game would allow: wall banners hang on the block face behind them, standing ones stand
+    on a block. Gatehouse: two on the south gallery under the eaves (Cam.Fort, behind the line).
+    Square: four on fence posts along the south edge facing the line, above the recruits' heads
+    (the background of shots 09-10).
+    Range: one on the west face of every gate's crossbar, facing the launch line (shots 12-13)."""
+    gx0 = M["fort_origin"][0] + 26                    # the south gatehouse: x gx0..gx0+7 (fort.py bx0..bx1)
+    gz = M["gate_south"][2] + 2                       # the block in front of its gallery wall
+    sx0, sx1, sz0, sz1 = M["square"]
+    spots = [("Gate.W", (gx0 + 1, LV + 8, gz), dict(wall_facing="south")),
+             ("Gate.E", (gx0 + 6, LV + 8, gz), dict(wall_facing="south"))]
+    for i, (x, top, z) in enumerate(M["banner_posts"]):                         # on 2-high fence posts
+        spots.append((f"Square{i}", (x, top + 1, z), dict(rotation=8)))           # front to the north
+    for gx, bar_y, _z0, _z1 in M["gates"]:
+        spots.append((f"Range{gx}", (gx - 1, bar_y, M["range_centre_z"]), dict(wall_facing="west")))
+    for tag, block, kw in spots:
+        root = BN.empire("steve", "Banner." + tag, standing="wall_facing" not in kw)
+        BN.place(root, block, **kw)
+        BN.animate(root, 1, frame_end)
+
+
 def build():
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o, do_unlink=True)
@@ -73,6 +97,7 @@ def build():
     sc.eevee.shadow_pool_size = '1024'
     SET.load("drill")
     recruits()
+    banners()
     SET.cameras(CAMS, "drill")
     use_camera("Cam.Wide")
     L.apply(LOOK)

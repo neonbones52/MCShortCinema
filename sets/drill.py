@@ -170,6 +170,11 @@ for x in (x0, x1):                                # corner posts with lanterns
         put(x, L + 1, z, "spruce_fence")
         put(x, L + 2, z, "spruce_fence")
         put(x, L + 3, z, blk("lantern", hanging="false", waterlogged="false"))
+BANNER_POSTS = []                                 # Steve's banners stand on 2-high fence posts along the south
+for x in range(x0 + 4, x1, 12):                   # edge, above the heads of the line (tests/test_drill.py)
+    put(x, L + 1, z1 - 1, "spruce_fence")
+    put(x, L + 2, z1 - 1, "spruce_fence")
+    BANNER_POSTS.append([x, L + 2, z1 - 1])
 for z in range(z0 + 2, z1 - 1, 3):                # rocket racks along the west edge: barrels, a chest
     put(x0 + 1, L + 1, z, blk("barrel", facing="up", open="false"))
 put(x0 + 1, L + 2, z0 + 5, blk("barrel", facing="up", open="false"))
@@ -295,7 +300,7 @@ while trees < 22:
 MARKS = dict(
     size=[W, H, D], level=L,
     fort=list(PAL), fort_origin=list(FO), gate_south=[GATE_X[0], L, PAL[3]], gate_north=[GATE_X[0], L, PAL[2]],
-    square=list(SQUARE), line=[[x, L, z] for x, z in LINE], line_facing="north", sergeant=[SERGEANT[0], L, SERGEANT[1]],
+    square=list(SQUARE), banner_posts=BANNER_POSTS, line=[[x, L, z] for x, z in LINE], line_facing="north", sergeant=[SERGEANT[0], L, SERGEANT[1]],
     launch_x=LAUNCH_X, range_z=list(RANGE_Z), range_centre_z=RANGE_C,
     range_ground=[[x, int(HM[x, RANGE_C])] for x in range(LAUNCH_X, W, 8)],
     haystacks=HAY, gates=GATES, posts_x=list(POSTS_X))
