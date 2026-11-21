@@ -631,6 +631,9 @@ def _fog_group(st, haze=None):
         g = bpy.data.node_groups.new("MC.TerrainFog", 'ShaderNodeTree')
         g.interface.new_socket("Shader", in_out='INPUT', socket_type='NodeSocketShader')
         g.interface.new_socket("Shader", in_out='OUTPUT', socket_type='NodeSocketShader')
+    if "Alpha" not in [i.name for i in g.interface.items_tree if i.in_out == 'INPUT']:
+        a = g.interface.new_socket("Alpha", in_out='INPUT', socket_type='NodeSocketFloat')
+        a.default_value, a.min_value, a.max_value = 1.0, 0.0, 1.0
     nt = g.nodes
     nt.clear()
     gi = nt.new('NodeGroupInput')
@@ -662,6 +665,17 @@ def _fog_group(st, haze=None):
     mr.inputs['From Max'].default_value = end
     g.links.new(cyl.outputs[0], mr.inputs['Value'])
     src = gi.outputs[0]
+
+    def by_alpha(socket):
+        """Fog is an emission mixed in, and emission ignores the material's alpha: without this
+        the cut-out parts of grass, leaves and flowers glow with the fog colour far away
+        (whole pale cards instead of tufts, HANDOFF pitfall 27)."""
+        m = nt.new('ShaderNodeMath')
+        m.operation = 'MULTIPLY'
+        g.links.new(socket, m.inputs[0])
+        g.links.new(gi.outputs['Alpha'], m.inputs[1])
+        return m.outputs[0]
+
     if haze and haze.get('amount', 0) > 0:
         hr = nt.new('ShaderNodeMapRange')
         hr.clamp = True
@@ -673,14 +687,14 @@ def _fog_group(st, haze=None):
         hem = nt.new('ShaderNodeEmission')
         hem.inputs['Color'].default_value = (*lin(haze.get('color') or st['fog']), 1)
         hmix = nt.new('ShaderNodeMixShader')
-        g.links.new(hr.outputs['Result'], hmix.inputs[0])
+        g.links.new(by_alpha(hr.outputs['Result']), hmix.inputs[0])
         g.links.new(src, hmix.inputs[1])
         g.links.new(hem.outputs[0], hmix.inputs[2])
         src = hmix.outputs[0]
     em = nt.new('ShaderNodeEmission')
     em.inputs['Color'].default_value = (*lin(st['fog']), 1)
     mix = nt.new('ShaderNodeMixShader')
-    g.links.new(mr.outputs['Result'], mix.inputs[0])
+    g.links.new(by_alpha(mr.outputs['Result']), mix.inputs[0])
     g.links.new(src, mix.inputs[1])
     g.links.new(em.outputs[0], mix.inputs[2])
     g.links.new(mix.outputs[0], go.inputs[0])
@@ -702,11 +716,16 @@ def terrain_fog(st, materials=None, haze=None):
             continue
         link = out.inputs['Surface'].links[0]
         if link.from_node.type == 'GROUP' and link.from_node.node_tree == g:
-            continue
-        src = link.from_socket
-        gn = nt.nodes.new('ShaderNodeGroup')
-        gn.node_tree = g
-        gn.location = (out.location.x - 200, out.location.y - 150)
-        nt.links.new(src, gn.inputs[0])
-        nt.links.new(gn.outputs[0], out.inputs['Surface'])
+            gn = link.from_node
+        else:
+            src = link.from_socket
+            gn = nt.nodes.new('ShaderNodeGroup')
+            gn.node_tree = g
+            gn.location = (out.location.x - 200, out.location.y - 150)
+            nt.links.new(src, gn.inputs[0])
+            nt.links.new(gn.outputs[0], out.inputs['Surface'])
+        # the material's alpha (cut-out textures) also masks the fog
+        bsdf = next((n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+        if bsdf is not None and bsdf.inputs['Alpha'].links and not gn.inputs['Alpha'].links:
+            nt.links.new(bsdf.inputs['Alpha'].links[0].from_socket, gn.inputs['Alpha'])
     return g

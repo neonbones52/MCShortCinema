@@ -51,6 +51,44 @@ def ground(x, z, name="village", top=400.0):
     return None
 
 
+class Above(float):
+    """A camera height given above the ground under the camera (ground()), not as set Y."""
+
+
+def cameras(cams, name):
+    """Survey / shot cameras from {cam name: ((x, y, z), (tx, ty, tz), lens)} in set coordinates;
+    y may be Above(h). Creates a camera only if it is missing (never touches a camera the user
+    placed or keyed by hand, HANDOFF "user edits"); then check_cameras()."""
+    sc = bpy.context.scene
+    for cname, (pos, target, lens) in cams.items():
+        cam = bpy.data.objects.get(cname)
+        if cam is not None:
+            continue
+        cam = bpy.data.objects.new(cname, bpy.data.cameras.new(cname))
+        sc.collection.objects.link(cam)
+        x, y, z = pos
+        if isinstance(y, Above):
+            y = ground(x, z, name) + y
+        tx, ty, tz = target
+        if isinstance(ty, Above):
+            ty = ground(tx, tz, name) + ty
+        cam.location = b(x, y, z)
+        cam.rotation_euler = (b(tx, ty, tz) - cam.location).to_track_quat('-Z', 'Y').to_euler()
+        cam.data.lens = lens
+    check_cameras(cams, name)
+
+
+def check_cameras(names, name, min_clearance=0.3):
+    """Every camera must be above the set surface under it (pitfall 25: the land is not flat)."""
+    for cname in names:
+        loc = bpy.data.objects[cname].location
+        g = ground(loc.x, -loc.y, name)
+        clear = None if g is None else loc.z - g
+        print("CAMERA", cname, "ground", g, "clearance", clear)
+        if clear is not None and clear < min_clearance:
+            raise RuntimeError(f"{cname} is {clear:.2f} above the ground (below {min_clearance}): under the set?")
+
+
 def marks(name):
     with open(os.path.join(SETS, name + "_marks.json"), encoding="utf-8") as fh:
         return json.load(fh)

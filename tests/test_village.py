@@ -4,7 +4,7 @@ puts down survey cameras and saves blender/sets/village.blend.
 First build the set:   python tools/build_set.py village
 Then (in the live Blender through MCP, or in background):
     exec(open(r"C:\\Dev\\Projects\\CinemaShort\\tests\\test_village.py", encoding="utf-8").read())
-    blender -b --factory-startup --addons MCprep_addon --python tests/test_village.py
+    blender -b --python tests/test_village.py      (user prefs: MCprep needs them, not --factory-startup)
 Survey stills (background, the .blend is not saved):
     blender -b blender/sets/village.blend --python tests/test_village.py -- render [percent]
 -> renders/tests/village/<camera>_v1.png
@@ -31,10 +31,7 @@ FX0, FX1, FZ0, FZ1 = M["field"]
 CX, CY, CZ = M["crest"]
 SQ = M["meeting"]
 
-
-
-class Above(float):
-    """Camera height given above the ground under the camera (SET.ground), not as set Y."""
+Above = SET.Above
 
 
 # name: (position, target, lens) in set coordinates (X east, Y up, Z south)
@@ -66,29 +63,9 @@ def build():
     sc.eevee.taa_render_samples = 32
     sc.eevee.shadow_pool_size = '1024'
     SET.load("village")
-    for name, (pos, target, lens) in CAMS.items():
-        cam = bpy.data.objects.new(name, bpy.data.cameras.new(name))
-        sc.collection.objects.link(cam)
-        x, y, z = pos
-        if isinstance(y, Above):
-            y = SET.ground(x, z) + y
-        cam.location = SET.b(x, y, z)
-        cam.rotation_euler = (SET.b(*target) - cam.location).to_track_quat('-Z', 'Y').to_euler()
-        cam.data.lens = lens
+    SET.cameras(CAMS, "village")
     use_camera("Cam.Wide")
     L.apply(LOOK)
-    check_cameras()
-
-
-def check_cameras(min_clearance=0.3):
-    """Every camera must be above the set surface under it (pitfall 25: the land is not flat)."""
-    for name in CAMS:
-        loc = bpy.data.objects[name].location
-        g = SET.ground(loc.x, -loc.y)
-        clear = None if g is None else loc.z - g
-        print("CAMERA", name, "ground", g, "clearance", clear)
-        if clear is not None and clear < min_clearance:
-            raise RuntimeError(f"{name} is {clear:.2f} above the ground (below {min_clearance}): under the set?")
 
 
 def render(percent=100):
