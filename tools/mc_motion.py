@@ -84,7 +84,8 @@ class Actor:
         self.yaw = yaw
         self.scale = rig.scale[0]
         kind = dict(rig.get("mc_character", {})).get("kind", "villager")
-        self.head_top_px = 32.0 if kind == "player" else 34.0    # villager head is 10 px tall
+        # villager head is 10 px tall; the baby villager (26.x model) is 16 px tall in all
+        self.head_top_px = {"player": 32.0, "baby_villager": 16.0}.get(kind, 34.0)
         self.paths, self.looks, self.faces, self.gestures, self.swings = [], [], [], [], []
         self.sits = []
         self.state = {}

@@ -44,7 +44,7 @@ S5 = K["soldiers"][5]                                # a fire-step place on the 
 
 CAMS = {
     "Cam.Wide": ((170, Above(28), 110), (305, Above(0), 175), 24),                    # shot 18: over the lines
-    "Cam.Trench": ((S5[0] + 2.0, S5[1] + 0.4, S5[2] - 4.5), (S5[0], S5[1] + 1.7, S5[2]), 20),   # shot 19 (same bay)
+    "Cam.Trench": ((S5[0] + 1.0, S5[1] + 0.2, S5[2] - 4.5), (S5[0] - 1.0, S5[1] + 1.7, S5[2]), 20),   # shot 19 (same bay, on the floor)
     "Cam.Nomans": ((K["wire_x"] - 26, Above(1.8), 150), (L1, Above(1.2), 160), 28),   # no-man's land to the lines
     "Cam.Hero": ((HX + 3.5, Above(1.7), HZ + 0.6), (HX - 40, Above(9), HZ), 28),      # shot 25: over his shoulder, west
     "Cam.Field": ((HX + 28, Above(16), HZ + 14), (HX - 25, Above(0), HZ - 4), 24),    # shot 27: the end of the dolly

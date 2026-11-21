@@ -121,7 +121,8 @@ HM0 = HM.copy()                                   # the ground before digging: t
 def trench_line(base):
     """A zigzag line: 10-block fire bays alternately 4 blocks forward and back, joined by
     traverses. Cross-section from the west: parapet (mud bricks on the lip), fire step (top
-    G-1), floor two blocks down (top G-2) with duckboards, plank revetment on the east wall."""
+    G-1, two blocks wide: user 2026-11-21, the shooters stood pressed against the mud bricks), floor
+    two blocks down (top G-2) with duckboards, plank revetment on the east wall."""
     cells = []
     for z in range(*Z_RANGE):
         off = 4 if (z // 10) % 2 else 0
@@ -134,7 +135,7 @@ def trench_line(base):
         g = int(round(float(np.mean(HM0[max(xb - 2, 0):xb + 5, z]))))
         cols = (xb, xb + 1, xb + 2) if kind == "bay" else (xb,)
         for i, x in enumerate(cols):
-            step = kind == "bay" and i == 0
+            step = kind == "bay" and i <= 1           # a 2-block fire step: the shooters stand off the parapet
             floor_top = g - 1 if step else g - 2
             for y in range(floor_top + 1, g + 2):
                 put(x, y, z, 0)
@@ -160,7 +161,7 @@ for base in LINES_X:
     for z in range(Z_RANGE[0] + 9, Z_RANGE[1] - 9, 20):     # fire-step places, 12 per line
         off = 4 if (z // 10) % 2 else 0
         xb = base + off
-        SOLDIERS.append([xb + 0.5, int(HM[xb, z]) + 1, z + 0.5])
+        SOLDIERS.append([xb + 1.5, int(HM[xb + 1, z]) + 1, z + 0.5])   # the back block of the step (user 2026-11-21)
 # communication trenches between the lines (east-west, 2 wide)
 for z0 in COMMS_Z:
     for x in range(LINES_X[0] + 3, LINES_X[-1] + 3):
