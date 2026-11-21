@@ -230,6 +230,18 @@ for gx in GATES_X:                                # log gates over the flight li
     for z in range(zs[0], zs[1] + 1):
         put(gx, top + 1, z, blk("stripped_spruce_log", axis="z"))
     GATES.append([gx, top + 1, zs[0], zs[1]])
+    # a crash mat of hay under the gate (user, 2026-11-21: a recruit who falls here lands in hay):
+    # 5 x 13 bales between the posts, a 3 x 9 layer on top, bales missing at the ragged edges
+    for i, (w, d) in enumerate(((5, 13), (3, 9))):
+        for dx in range(-(w // 2), w // 2 + 1):
+            for dz in range(-(d // 2), d // 2 + 1):
+                x, z = gx + dx, RANGE_C + dz
+                edge = abs(dx) == w // 2 or abs(dz) == d // 2
+                if edge and h3(x, i, z, 67) < (0.35 if i else 0.2):
+                    continue
+                put(x, HM[x, z] + 1 + i, z, blk("hay_block", axis="x" if (x + z + i) % 3 else "z"))
+                used[x, z] = True
+    HAY.append([gx, int(HM[gx, RANGE_C]) + 2, RANGE_C])
 
 # ================================================================ meadow: grass, a few flowers, trees
 FLOWERS = ("dandelion", "poppy", "azure_bluet", "oxeye_daisy", "cornflower")

@@ -35,7 +35,8 @@ def stand(x, z, top_y, center=True):
 def ground(x, z, name="village", top=400.0):
     """Set Y of the walkable surface at set column (x, z): a ray straight down through the scene
     that only counts hits on "Set.<name>" (sky, cameras and actors are skipped). Grass and flowers
-    count too, so a hit on a plant is up to a block above the ground under it. None off the set.
+    count too, so a hit on a plant is up to a block above the ground under it, and so does anything
+    built over the point (a gate's crossbar, a roof): aim at such places with marks. None off the set.
     Use it for camera heights: the land is not flat (HANDOFF pitfall 25)."""
     sc = bpy.context.scene
     dg = bpy.context.evaluated_depsgraph_get()
