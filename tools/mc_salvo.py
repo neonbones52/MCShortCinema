@@ -14,6 +14,7 @@ Photosensitivity (approved: no more than ~3 bright flashes per second, no global
 """
 import math
 import random
+import bpy
 
 from mathutils import Vector
 
@@ -57,3 +58,63 @@ def barrage(cloud, line_a, line_b, aim_dir, frame0, frame1, seed=7, shots_per_se
         bursts += [(bf, bp, col) for _, bf, bp, col in shots]
         k += 1
     return bursts
+
+
+def key_light(lights, target, frame0, frame1, share=0.75, name="Barrage.Key", collection=None):
+    """One shadowed key light standing in for many shadowless burst lights (the bursts are far
+    off and each has use_shadow off: alone they flood the field flat, with no form). Every frame
+    the burst lights' irradiance at `target` is summed (point light of P watts: P / (4 pi^2 d^2));
+    a sun lamp takes `share` of it, from the weighted direction of the bursts and in their
+    weighted colour, with shadows; the burst lights keep the rest (coloured glints).
+    lights: the burst light objects (FW.glow_light, energy keyed)."""
+    target = Vector(target)
+
+    def energy_curve(ob):
+        ad = ob.data.animation_data
+        for layer in ad.action.layers:
+            for strip in layer.strips:
+                for cb in strip.channelbags:
+                    for fc in cb.fcurves:
+                        if fc.data_path == "energy":
+                            return fc
+        return None
+
+    data = []
+    for ob in lights:
+        fc = energy_curve(ob)
+        if fc is None:
+            continue
+        d2 = max((ob.location - target).length_squared, 1.0)
+        data.append((fc, ob.location.copy(), Vector(ob.data.color), d2))
+    ld = bpy.data.lights.new(name, 'SUN')
+    ld.angle = math.radians(1.5)
+    ld.use_shadow = True
+    sun = bpy.data.objects.new(name, ld)
+    (collection or bpy.context.scene.collection).objects.link(sun)
+    sun.rotation_mode = 'QUATERNION'
+    prev_q = None
+    for f in range(int(frame0), int(frame1) + 1):
+        tot, pos, col = 0.0, Vector((0, 0, 0)), Vector((0, 0, 0))
+        for fc, p, c, d2 in data:
+            e = max(fc.evaluate(f), 0.0) / (4 * math.pi * math.pi * d2)
+            tot += e
+            pos += p * e
+            col += c * e
+        ld.energy = tot * share
+        ld.keyframe_insert("energy", frame=f)
+        if tot > 1e-9:
+            src = pos / tot
+            ld.color = tuple(col / max(col) if max(col) > 0 else Vector((1, 1, 1)))
+            q = (target - src).to_track_quat('-Z', 'Y')
+            if prev_q is not None and q.dot(prev_q) < 0:
+                q.negate()
+            sun.rotation_quaternion = q
+            prev_q = q
+        ld.keyframe_insert("color", frame=f)
+        sun.keyframe_insert("rotation_quaternion", frame=f)
+    for fc, _p, _c, _d in data:                     # the burst lights keep the rest
+        for k in fc.keyframe_points:
+            k.co.y *= (1.0 - share)
+            k.handle_left.y *= (1.0 - share)
+            k.handle_right.y *= (1.0 - share)
+    return sun

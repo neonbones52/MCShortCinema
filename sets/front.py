@@ -1,14 +1,16 @@
 """Location 4: the front (shots 18-28, night), 448 x 320 blocks.
 
-West to east (x): the open plain of Steve's side, where the waves fly in from and where the
-finale is played (not superflat, a few craters, the odd tree); the hero's spot 55 blocks in front
-of the first trench, looking west; no-man's land, churned and cratered, shattered trunks, a belt
-of barbed wire (cobwebs on fence posts); Alex's three trench lines, zigzag (fire bays and
+West to east (x): the open plain of Steve's side, where the waves fly in from (not superflat, a
+few craters, the odd tree); no-man's land, churned and cratered, shattered trunks, a belt of
+barbed wire (cobwebs on fence posts); Alex's three trench lines, zigzag (fire bays and
 traverses), with a sandbag parapet (mud bricks), a fire step, duckboards and plank revetment,
-joined by communication trenches; Alex's rear with tents and supplies.
-From the user's decisions: no trench near the hero (finale), at least 30 of Alex's soldiers
-(36 fire-step places), rockets fly from the trenches over the hero's back and burst 64-80
-blocks out, in front of him (mc_crossbow physics).
+joined by communication trenches; Alex's rear with tents and supplies, and in it the field of
+the finale: the hero's spot 75 blocks behind the last line, looking west, back where he flew
+from, over the trenches.
+From the user's decisions (2026-11-21): at least 30 of Alex's soldiers (36 fire-step places);
+the fallen lie in Alex's rear, behind the crossbowmen's backs (the waves crossed the lines and
+were shot down over the rear); the hero watches the barrage go up ahead of him from the
+trenches into the sky (air defence), bursting 64-80 blocks beyond them (mc_crossbow physics).
 
 Axes: X = east, Y = up, Z = south. In Blender (OBJ, forward -Z, up Y): x = X, y = -Z, z = Y.
     C:\\Games\\MCBuilder\\venv\\Scripts\\python sets\\front.py   -> assets/sets/front.schem,
@@ -57,7 +59,7 @@ LINES_X = (292, 306, 320)                         # Alex's trench lines (west ed
 Z_RANGE = (40, 280)                               # the trenches run north-south
 COMMS_Z = range(64, 270, 48)                      # communication trenches between the lines
 WIRE_X = LINES_X[0] - 14                          # barbed wire belt
-HERO = (LINES_X[0] - 55, 160)                     # where the hero comes to (finale), looks west
+HERO = (LINES_X[-1] + 75, 160)                    # finale: in Alex's rear, looks west over the trenches
 NOMANS = (200, LINES_X[0] - 3)                    # churned ground
 REAR = (LINES_X[-1] + 12, W - 6)
 
@@ -70,6 +72,12 @@ for _ in range(10):
     blur = (blur + np.roll(blur, 1, 0) + np.roll(blur, -1, 0) + np.roll(blur, 1, 1) + np.roll(blur, -1, 1)) / 5.0
 wb = sm(1.0 - np.maximum(np.maximum(LINES_X[0] - 6 - XX, XX - LINES_X[-1] - 12), 0) / 8.0)
 HMf = HMf * (1 - wb) + blur * wb
+# the finale's field: an almost level stretch around the hero (the camera dollies 30 blocks back
+# east at head height and must not run into rising ground); 15 % of the relief is kept
+_fd = np.hypot(np.maximum(np.abs(XX - HERO[0]) - 45, 0), np.maximum(np.abs(ZZ - HERO[1]) - 45, 0))
+_fw = 0.85 * (1.0 - sm(_fd / 18.0))
+_lvl = float(HMf[HERO[0] - 45:HERO[0] + 46, HERO[1] - 45:HERO[1] + 46].mean())
+HMf = HMf * (1 - _fw) + _lvl * _fw
 # craters: bowls with a rim, many in no-man's land, some on the plain
 CRATERS = []
 for n, (xa, xb), (r0, r1) in ((70, NOMANS, (2.0, 4.5)), (26, (40, NOMANS[0]), (1.5, 3.5)), (10, (REAR[0], REAR[1]), (1.5, 3.0))):
@@ -201,7 +209,7 @@ for i in range(6):
         put(cx + 3, HM[cx + 3, z0 + k] + 1, z0 + k, blk("barrel", facing="up", open="false"))
 
 # ================================================================ grass, flowers, trees on the living plain
-FLOWERS = ("dandelion", "poppy", "azure_bluet", "oxeye_daisy", "cornflower")
+FLOWERS = ("dandelion", "azure_bluet", "oxeye_daisy", "cornflower", "cornflower")   # no poppies: there is one, the symbol
 for x in range(W):
     for z in range(D):
         y = HM[x, z]
@@ -209,6 +217,10 @@ for x in range(W):
             continue
         r = h3(x, 5, z, 91)
         p = 0.10 if nomans[x, z] else 0.24
+        if abs(x - HERO[0]) < 55 and abs(z - HERO[1]) < 55:
+            p = 0.05                              # the finale's field: trampled, the bodies must read
+            if abs(z - HERO[1]) <= 1 and HERO[0] - 3 <= x <= HERO[0] + 36:
+                p = 0.0                           # nothing between the dolly camera and the hero
         if r < p:
             put(x, y + 1, z, ctx("short_grass"))
         elif r < p + 0.004 and not nomans[x, z]:

@@ -49,9 +49,6 @@ POSES = {
     "prone_twisted": dict(lay=(88, 0), bones={"body": (0, 0.45, 0.12), "arm.R": (-0.45, 0, 0.3), "arm.L": (-2.3, 0, -0.2),
                                               "leg.R": (0.1, 0, 0.1), "leg.L": (0.05, 0, -0.55), "head": (0.0, -1.2, 0)},
                           wings=(0.35, 0.05, -1.3)),
-    "sitting_slumped": dict(lay=(0, 0), bones={"leg.R": (-1.5, 0, 0.12), "leg.L": (-1.45, 0, -0.18), "body": (0.75, 0, 0),
-                                               "head": (0.85, 0.25, 0), "arm.R": (-0.55, 0, 0.1), "arm.L": (-0.35, 0, -0.05)},
-                            wings=C.WING_STAND),
     "supine_arm_up": dict(lay=(-90, 0), bones={"arm.R": (-1.35, 0, 0.1), "arm.L": (0.1, 0, -0.25), "leg.L": (-0.5, 0, -0.1),
                                                "leg.R": (0.05, 0, 0.15), "head": (0.1, -0.8, 0)}, wings=(0.05, 0, -0.5)),
     "prone_wings_out": dict(lay=(92, 0), bones={"arm.R": (-0.25, 0, 0.05), "arm.L": (-0.3, 0, -0.05),
@@ -62,9 +59,13 @@ POSES = {
                                                 "head": (0.4, 0.3, 0)}, wings=(0.04, 0, -0.2)),
     "prone_crawl": dict(lay=(90, 0), bones={"arm.R": (-2.6, 0, 0.15), "arm.L": (0.35, 0, -0.1), "leg.R": (0.35, 0, 0.05),
                                             "leg.L": (-0.35, 0, -0.05), "head": (-0.55, 0, 0)}, wings=(0.45, 0.05, -0.7)),
-    "facedown_kneeling": dict(lay=(55, 0), bones={"leg.R": (-1.1, 0, 0.05), "leg.L": (-1.05, 0, -0.08), "arm.R": (-0.2, 0, 0.6),
-                                                  "arm.L": (-0.1, 0, -0.7), "head": (0.3, 0.9, 0)}, wings=(0.3, 0, -0.5)),
+    "supine_twisted": dict(lay=(-90, 0), bones={"body": (0, 0.5, 0), "arm.R": (0.3, 0, 0.9), "arm.L": (-0.6, 0, -0.4),
+                                                "leg.R": (0, 0, -0.1), "leg.L": (0.05, 0, 0.12), "head": (0.3, -0.9, 0)},
+                           wings=(0.05, 0, -0.3)),
+    "side_flat": dict(lay=(0, 90), bones={"arm.R": (-0.2, 0, 0.2), "arm.L": (0.3, 0, -0.1), "leg.R": (0.2, 0, 0),
+                                          "leg.L": (-0.05, 0, 0), "head": (0.2, 0, 0)}, wings=(0.2, 0, -0.3)),
 }
+# Not used: sitting or kneeling bodies; seen from behind they read as people standing (user, 2026-11-21).
 KNEEL = dict(lay=(0, 0), bones={"leg.R": (1.5, 0, 0.06), "leg.L": (1.5, 0, -0.06), "body": (0.12, 0, 0),
                                 "head": (-0.25, 0, 0), "arm.R": (0.1, 0, 0.08), "arm.L": (0.15, 0, -0.06)},
              wings=C.WING_STAND)
@@ -199,27 +200,34 @@ def scatter(n, area, set_name, avoid=(), seed=1, spacing=2.4, tries=4000):
     return spots
 
 
-def field(spots, set_name, seed=1, name="Fallen"):
-    """A body on every spot: the recruits' kit, a pose from the library (each used in turn, so the
-    neighbours differ), jitter, a random yaw, torn wings (3 variants), now and then the helmet
-    lost (the profession hat is then seen, as in the game)."""
+def body(name, set_name, x, z, pose_name, yaw, rng=None, helmet="iron", wings=0):
+    """One fallen comrade at set column (x, z): the recruits' kit (no profession hat), pose
+    `pose_name` with a little jitter, torn wings variant `wings`, yaw in radians (0: lying
+    along -Y; prone bodies then have the head to the south, -pi/2 puts it to the west)."""
     import contextlib
     import io
+    rng = rng or random.Random(0)
+    with contextlib.redirect_stdout(io.StringIO()):
+        rig = C.villager(name, skin=SKINS[rng.randrange(len(SKINS))], helmet=helmet,
+                         legs="iron", boots="iron", elytra=True, hat=False)   # no profession hats in battle
+    apply_pose(rig, POSES[pose_name], jitter=0.18, rng=rng)
+    tear_wings(rig, wings)
+    lay(rig, POSES[pose_name], yaw, set_name, x, z)
+    rig["mc_fallen"] = pose_name
+    return rig
+
+
+def field(spots, set_name, seed=1, name="Fallen", start=0):
+    """A body on every spot: a pose from the library (each used in turn, so neighbours differ),
+    jitter, a random yaw, torn wings (3 variants), now and then the helmet lost (a bare head)."""
     rng = random.Random(seed)
     names = list(POSES)
     rng.shuffle(names)
     rigs = []
     for i, (x, z) in enumerate(spots):
-        pose_name = names[i % len(names)]
         helmet = None if rng.random() < 0.22 else "iron"
-        with contextlib.redirect_stdout(io.StringIO()):
-            rig = C.villager(f"{name}{i:02d}", skin=SKINS[rng.randrange(len(SKINS))], helmet=helmet,
-                             legs="iron", boots="iron", elytra=True)
-        apply_pose(rig, POSES[pose_name], jitter=0.18, rng=rng)
-        tear_wings(rig, rng.randrange(3))
-        lay(rig, POSES[pose_name], rng.uniform(0, 2 * PI), set_name, x, z)
-        rig["mc_fallen"] = pose_name
-        rigs.append(rig)
+        rigs.append(body(f"{name}{start + i:02d}", set_name, x, z, names[i % len(names)], rng.uniform(0, 2 * PI),
+                         rng, helmet, rng.randrange(3)))
     return rigs
 
 
