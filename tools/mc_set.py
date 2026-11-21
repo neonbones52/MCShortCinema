@@ -32,24 +32,32 @@ def stand(x, z, top_y, center=True):
     return Vector((x + o, -(z + o), top_y + 1.0))
 
 
-def ground(x, z, name="village", top=400.0):
-    """Set Y of the walkable surface at set column (x, z): a ray straight down through the scene
-    that only counts hits on "Set.<name>" (sky, cameras and actors are skipped). Grass and flowers
-    count too, so a hit on a plant is up to a block above the ground under it, and so does anything
-    built over the point (a gate's crossbar, a roof): aim at such places with marks. None off the set.
-    Use it for camera heights: the land is not flat (HANDOFF pitfall 25)."""
+def _set_ray(origin, direction, name):
+    """First hit on "Set.<name>" along a ray (other objects are passed through): (point, normal)."""
     sc = bpy.context.scene
     dg = bpy.context.evaluated_depsgraph_get()
     target = bpy.data.objects["Set." + name]
-    origin, down = Vector((x, -z, top)), Vector((0.0, 0.0, -1.0))
+    # a ray running exactly along a block edge (integer x or z) slips between the faces: nudge it
+    origin = Vector(origin) + Vector((1.37e-4, 0.91e-4, 0.0))
+    direction = Vector(direction).normalized()
     for _ in range(64):
-        hit, loc, _n, _i, ob, _m = sc.ray_cast(dg, origin, down)
+        hit, loc, nrm, _i, ob, _m = sc.ray_cast(dg, origin, direction)
         if not hit:
             return None
         if ob.original == target:
-            return loc.z
-        origin = loc + down * 1e-3
+            return loc, nrm
+        origin = loc + direction * 1e-3
     return None
+
+
+def ground(x, z, name="village", top=400.0):
+    """Set Y of the walkable surface at set column (x, z): a ray straight down from `top` that only
+    counts hits on "Set.<name>" (sky, cameras and actors are skipped). Grass and flowers count too,
+    so a hit on a plant is up to a block above the ground under it, and so does anything built over
+    the point (a gate's crossbar, a roof: for interiors pass top = a height inside the room, or
+    give absolute heights). None off the set. The land is not flat (HANDOFF pitfall 25)."""
+    hit = _set_ray((x, -z, top), (0, 0, -1), name)
+    return None if hit is None else hit[0].z
 
 
 class Above(float):
@@ -80,14 +88,18 @@ def cameras(cams, name):
 
 
 def check_cameras(names, name, min_clearance=0.3):
-    """Every camera must be above the set surface under it (pitfall 25: the land is not flat)."""
+    """Every camera must stand above the set surface under it (pitfall 25: the land is not flat),
+    inside a building too: the clearance is measured down from the camera itself, and a camera is
+    under the ground if the first surface above it faces up (the top of a block)."""
     for cname in names:
         loc = bpy.data.objects[cname].location
-        g = ground(loc.x, -loc.y, name)
-        clear = None if g is None else loc.z - g
-        print("CAMERA", cname, "ground", g, "clearance", clear)
-        if clear is not None and clear < min_clearance:
-            raise RuntimeError(f"{cname} is {clear:.2f} above the ground (below {min_clearance}): under the set?")
+        down = _set_ray(loc, (0, 0, -1), name)
+        up = _set_ray(loc, (0, 0, 1), name)
+        clear = None if down is None else loc.z - down[0].z
+        buried = up is not None and up[1].z > 0.5
+        print("CAMERA", cname, "clearance", clear, "buried" if buried else "")
+        if buried or (clear is not None and clear < min_clearance):
+            raise RuntimeError(f"{cname}: clearance {clear}, under a block top: {buried} (under the set?)")
 
 
 def marks(name):
